@@ -592,8 +592,8 @@
         let chatHistory = [];
         let uploadedFile = null; // To store the file temporarily for comment input
 
-        // AI's predefined knowledge
-        const systemPrompt = `
+        // AI's predefined knowledge (base, dynamic part added in callGeminiAPI)
+        const systemPromptBase = `
             Ты - Kreykeryy, продвинутый ИИ-помощник.
             Тебя создал Hexwoundik Edvn.
             У тебя есть следующие модули:
@@ -603,7 +603,6 @@
             - Kreyker S1 Pro: Глубокое раздумье.
             - Kreyker S2: Глубокое раздумье + Улучшенный поиск (как у S1).
             - Kreyker S3 MAX: Максимальная точность (Глубокое раздумье + Улучшенный поиск + Точность).
-            Если тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${currentModel}."
             Отвечай на вопросы, используя свои знания и возможности выбранной модели.
             Форматируй ответы, используя **жирный**, _курсив_, --зачеркнутый--, \`код\`, "цитаты" или > блоки цитат.
             Для блоков кода используй тройные обратные кавычки с указанием языка, например: \`\`\`python\nprint("Hello")\n\`\`\`
@@ -1052,9 +1051,8 @@
         });
 
         // Function to call Gemini API for text
-        async function callGeminiAPI(prompt, chatHistoryContext = []) {
+        async function callGeminiAPI(prompt, chatHistoryContext = [], modelUsed = currentModel) { // Added modelUsed parameter
             // Construct full chat history for Gemini API, ensuring role alternation.
-            // System prompt is prepended to the current user prompt.
             const contents = [];
             
             // Add previous chat history, ensuring roles alternate correctly
@@ -1063,14 +1061,15 @@
                 contents.push({ role: msg.role, parts: [{ text: msg.text }] });
             });
             
-            // The system prompt is now part of the *current* user message
-            contents.push({ role: "user", parts: [{ text: systemPrompt + "\n\n" + prompt }] });
+            // Dynamically add the system prompt with the current model information
+            const dynamicSystemPrompt = systemPromptBase + `\n\nЕсли тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${modelUsed}."`;
+            contents.push({ role: "user", parts: [{ text: dynamicSystemPrompt + "\n\n" + prompt }] });
 
             const payload = {
                 contents: contents
             };
-            // *** ВАЖНО: ВАШ API КЛЮЧ GEMINI (полученный из Google AI Studio) ***
-            const apiKey = ""; // <-- ВАШ КЛЮЧ GEMINI
+            // *** ВАЖНО: ВСТАВЬТЕ СЮДА СВОЙ API КЛЮЧ GEMINI ***
+            const apiKey = "YOUR_GEMINI_API_KEY"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1115,7 +1114,7 @@
             const contents = [{
                 role: "user",
                 parts: [
-                    { text: systemPrompt + "\n\n" + prompt },
+                    { text: systemPromptBase + `\n\nЕсли тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${currentModel}."` + "\n\n" + prompt },
                     {
                         inlineData: {
                             mimeType: mimeType,
@@ -1128,8 +1127,8 @@
             const payload = {
                 contents: contents,
             };
-            // *** ВАЖНО: ВАШ API КЛЮЧ GEMINI (полученный из Google AI Studio) ***
-            const apiKey = ""; // <-- ВАШ КЛЮЧ GEMINI
+            // *** ВАЖНО: ВСТАВЬТЕ СЮДА СВОЙ API КЛЮЧ GEMINI ***
+            const apiKey = "YOUR_GEMINI_API_KEY"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1187,25 +1186,25 @@
 
                 switch (model) {
                     case 'R1': // Общий поиск в интернете (simulated)
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R1 (Общий поиск).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R1 (Общий поиск).`, chatHistory, model);
                         break;
                     case 'R2': // С Gemini
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R2 (С Gemini).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R2 (С Gemini).`, chatHistory, model);
                         break;
                     case 'S1': // Улучшенный поиск (Google+Gemini = Gemini = Ответ)
                         const searchPrompt = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${promptToSend}".`;
-                        const searchResponse = await callGeminiAPI(searchPrompt, chatHistory);
+                        const searchResponse = await callGeminiAPI(searchPrompt, chatHistory, model);
                         const finalS1Prompt = `Используя следующую информацию: "${searchResponse}" и исходный запрос: "${promptToSend}", сформулируй полный и точный ответ. Модель: Kreyker S1 (Улучшенный поиск).`;
-                        aiResponse = await callGeminiAPI(finalS1Prompt, chatHistory);
+                        aiResponse = await callGeminiAPI(finalS1Prompt, chatHistory, model);
                         break;
                     case 'S1 Pro': // Глубокое раздумье
-                        aiResponse = await callGeminiAPI(`Глубоко проанализируй и дай развернутый ответ на вопрос: "${promptToSend}". Модель: Kreyker S1 Pro (Глубокое раздумье).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Глубоко проанализируй и дай развернутый ответ на вопрос: "${promptToSend}". Модель: Kreyker S1 Pro (Глубокое раздумье).`, chatHistory, model);
                         break;
                     case 'S2': // Глубокое раздумье + Улучшенный поиск
                         const searchPromptS2 = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${promptToSend}".`;
-                        const searchResponseS2 = await callGeminiAPI(searchPromptS2, chatHistory);
+                        const searchResponseS2 = await callGeminiAPI(searchPromptS2, chatHistory, model);
                         const finalS2Prompt = `Глубоко проанализируй и дай развернутый ответ, используя следующую информацию: "${searchResponseS2}" и исходный запрос: "${promptToSend}". Модель: Kreyker S2 (Глубокое раздумье + Улучшенный поиск).`;
-                        aiResponse = await callGeminiAPI(finalS2Prompt, chatHistory);
+                        aiResponse = await callGeminiAPI(finalS2Prompt, chatHistory, model);
                         break;
                     case 'S3 MAX': // Максимальная точность
                         const s3MaxPrompt = `
@@ -1214,10 +1213,10 @@
                             Особое внимание удели верификации фактов и предоставлению наиболее релевантных данных.
                             Модель: Kreyker S3 MAX (Глубокое раздумье + Улучшенный поиск + Точность).
                         `.trim();
-                        aiResponse = await callGeminiAPI(s3MaxPrompt, chatHistory);
+                        aiResponse = await callGeminiAPI(s3MaxPrompt, chatHistory, model);
                         break;
                     default:
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}".`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}".`, chatHistory, model);
                         break;
                 }
             } catch (error) {
@@ -1246,8 +1245,7 @@
             document.querySelectorAll('.model-option').forEach(option => {
                 option.classList.toggle('selected', option.dataset.model === currentModel);
             });
-            // Update the system prompt with the new currentModel
-            systemPrompt.replace(/Я сейчас использую модель \[текущая модель, например, Kreyker R2\]./g, `Я сейчас использую модель ${currentModel}.`);
+            // No need to update systemPrompt directly here, it's handled dynamically in callGeminiAPI
         }
 
 
