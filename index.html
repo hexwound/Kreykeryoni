@@ -179,7 +179,6 @@
             font-weight: 500;
             cursor: pointer;
             transition: background-color 0.2s ease, transform 0.1s ease;
-            white-space: nowrap; /* Prevent text wrapping */
         }
 
         .action-button:hover {
@@ -405,34 +404,6 @@
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1); }
         }
-
-        /* Thinking process display */
-        .thinking-process {
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 1rem;
-            border-radius: 15px;
-            margin-bottom: 0.75rem;
-            word-wrap: break-word;
-            margin-right: auto;
-            border-bottom-left-radius: 5px;
-            color: #333;
-            font-size: 0.9em;
-        }
-
-        .dark-theme .thinking-process {
-            background-color: rgba(50, 50, 50, 0.7);
-            color: #e0e0e0;
-        }
-
-        .thinking-process ol {
-            list-style-type: decimal;
-            padding-left: 1.5rem;
-            margin-top: 0.5rem;
-        }
-
-        .thinking-process li {
-            margin-bottom: 0.4rem;
-        }
     </style>
 </head>
 <body class="light-theme h-full">
@@ -462,9 +433,6 @@
             </button>
             <button id="modelSelectBtn" class="action-button p-3 rounded-full flex items-center justify-center text-xl">
                 <i class="fas fa-box"></i> </button>
-            <button id="thinkBtn" class="action-button p-3 px-5 rounded-full flex items-center justify-center text-base font-semibold">
-                <i class="fas fa-brain mr-2"></i> Думать
-            </button>
             <input type="text" id="messageInput" placeholder="Введите ваше сообщение..." class="input-box">
             <button id="sendMessageBtn" class="action-button p-3 rounded-full flex items-center justify-center text-xl">
                 <i class="fas fa-paper-plane"></i>
@@ -521,11 +489,7 @@
                 <label class="block text-sm font-medium mb-2">Акцентный цвет:</label>
                 <div class="flex gap-3 justify-center">
                     <div class="color-circle" style="background-color: #fcd34d;" data-color="#fcd34d"></div>
-                    <div class="color-circle" style="background-color: #fca5a5;" data-color="#fca5a5"></div>
-                    <div class="color-circle" style="background-color: #a7f3d0;" data-color="#a7f3d0"></div>
-                    <div class="color-circle" style="background-color: #bfdbfe;" data-color="#bfdbfe"></div>
-                    <div class="color-circle" style="background-color: #e9d5ff;" data-color="#e9d5ff"></div>
-                </div>
+                    <div class="color-circle" style="background-color: #fca5a5;" data-color="#fca5a5"></div> <div class="color-circle" style="background-color: #a7f3d0;" data-color="#a7f3d0"></div> <div class="color-circle" style="background-color: #bfdbfe;" data-color="#bfdbfe"></div> <div class="color-circle" style="background-color: #e9d5ff;" data-color="#e9d5ff"></div> </div>
             </div>
 
             <div class="mb-4 text-center">
@@ -534,17 +498,6 @@
             </div>
 
             <button class="action-button mt-4 w-full" onclick="closeModal('settingsModal')">Закрыть</button>
-        </div>
-    </div>
-
-    <div id="fileUploadPromptModal" class="modal-overlay">
-        <div class="modal-content">
-            <h2 class="text-xl font-semibold mb-4">Добавить комментарий к файлу</h2>
-            <textarea id="fileCommentInput" class="input-box w-full h-24 mb-4" placeholder="Введите, что ИИ должен сделать с этим файлом..."></textarea>
-            <div class="flex justify-end gap-2">
-                <button class="action-button py-2 px-4 rounded-lg" onclick="closeModal('fileUploadPromptModal')">Отмена</button>
-                <button id="sendFileWithCommentBtn" class="action-button py-2 px-4 rounded-lg">Отправить</button>
-            </div>
         </div>
     </div>
 
@@ -560,7 +513,6 @@
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendMessageBtn = document.getElementById('sendMessageBtn');
-        const thinkBtn = document.getElementById('thinkBtn'); // New "Think" button
         const modelSelectBtn = document.getElementById('modelSelectBtn');
         const settingsBtn = document.getElementById('settingsBtn');
         const modelSelectModal = document.getElementById('modelSelectModal');
@@ -578,11 +530,6 @@
         const messageBoxOverlay = document.getElementById('messageBoxOverlay');
         const messageBoxText = document.getElementById('messageBoxText');
 
-        // File Upload Prompt Modal elements
-        const fileUploadPromptModal = document.getElementById('fileUploadPromptModal');
-        const fileCommentInput = document.getElementById('fileCommentInput');
-        const sendFileWithCommentBtn = document.getElementById('sendFileWithCommentBtn');
-
         // App state (using localStorage for persistence without Firebase)
         let currentModel = localStorage.getItem('kreykeryy_model') || 'R2'; // Default model
         let currentTheme = localStorage.getItem('kreykeryy_theme') || 'light';
@@ -590,7 +537,6 @@
 
         // In-memory chat history (resets on page reload since no Firebase)
         let chatHistory = [];
-        let uploadedFile = null; // To store the file temporarily for comment input
 
         // AI's predefined knowledge
         const systemPrompt = `
@@ -601,23 +547,14 @@
             - Kreyker R2: Работает с Gemini.
             - Kreyker S1: Улучшенный поиск (ищет в интернете + тот же запрос у Gemini, затем Google+Gemini = Gemini = ответ).
             - Kreyker S1 Pro: Глубокое раздумье.
-            - Kreyker S2: Глубокое раздумье + Улучшенный поиск (как у S1).
+            - Kreyker S2: Глубокое раздумье + улучшенный поиск (как у S1).
             - Kreyker S3 MAX: Максимальная точность (Глубокое раздумье + Улучшенный поиск + Точность).
-            Если тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${currentModel}."
             Отвечай на вопросы, используя свои знания и возможности выбранной модели.
             Форматируй ответы, используя **жирный**, _курсив_, --зачеркнутый--, \`код\`, "цитаты" или > блоки цитат.
             Для блоков кода используй тройные обратные кавычки с указанием языка, например: \`\`\`python\nprint("Hello")\n\`\`\`
             Для других языков, например JavaScript, используй \`\`\`javascript\nconsole.log("Hello");\n\`\`\`
             Для HTML: \`\`\`html\n<p>Hello</p>\n\`\`\`
             Для CSS: \`\`\`css\nbody { color: red; }\n\`\`\`
-            Если пользователь нажимает кнопку "Думать", ты должен симулировать процесс размышления, выдавая пошаговые мысли, например:
-            1. Ищу более лучший ответ...
-            2. Что думал...
-            3. Как...
-            ...
-            ...
-            Ответ: [Финальный ответ]
-            Каждый шаг должен быть отдельным пунктом в нумерованном списке, а "Ответ:" должен быть в конце.
         `.trim();
 
         // Function to show custom message box
@@ -664,16 +601,6 @@
             updatePlaceholderImageColors(color);
         }
 
-        // Helper to determine if a color is light or dark for text contrast
-        function isLightColor(hex) {
-            const r = parseInt(hex.substring(1, 3), 16);
-            const g = parseInt(hex.substring(3, 5), 16);
-            const b = parseInt(hex.substring(5, 7), 16);
-            // HSP (Highly Sensitive Poo) equation from http://alienryderflex.com/hsp.html
-            const hsp = Math.sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
-            return hsp > 127.5; // Using 127.5 as the midpoint for light/dark
-        }
-
         // Function to update placeholder image colors
         function updatePlaceholderImageColors(color) {
             const textColor = isLightColor(color) ? '333' : 'fff'; // Simple contrast logic
@@ -698,6 +625,16 @@
             });
         }
 
+        // Helper to determine if a color is light or dark for text contrast
+        function isLightColor(hex) {
+            const r = parseInt(hex.substring(1, 3), 16);
+            const g = parseInt(hex.substring(3, 5), 16);
+            const b = parseInt(hex.substring(5, 7), 16);
+            // HSP (Highly Sensitive Poo) equation from http://alienryderflex.com/hsp.html
+            const hsp = Math.sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
+            return hsp > 127.5; // Using 127.5 as the midpoint for light/dark
+        }
+
         // Initial setup on load
         function initializeAppUI() {
             applyTheme(currentTheme);
@@ -706,15 +643,11 @@
         }
 
         // Add message to chat UI
-        function addMessageToChat(text, role, model = '', animate = true, isThinkingProcess = false) {
+        function addMessageToChat(text, role, model = '', animate = true) {
             const messageBubble = document.createElement('div');
-            if (isThinkingProcess) {
-                messageBubble.classList.add('thinking-process');
-            } else {
-                messageBubble.classList.add('message-bubble', role === 'user' ? 'user-bubble' : 'ai-bubble');
-            }
+            messageBubble.classList.add('message-bubble', role === 'user' ? 'user-bubble' : 'ai-bubble');
 
-            if (role === 'ai' && !isThinkingProcess) {
+            if (role === 'ai') {
                 const aiIcon = document.createElement('img');
                 aiIcon.src = `https://placehold.co/24x24/${currentAccentColor.substring(1)}/${isLightColor(currentAccentColor) ? '333' : 'fff'}?text=K&_=${new Date().getTime()}`;
                 aiIcon.alt = "AI Icon";
@@ -727,7 +660,7 @@
             messageContent.innerHTML = formatAIResponse(text);
             messageBubble.appendChild(messageContent);
 
-            if (role === 'ai' && !isThinkingProcess) {
+            if (role === 'ai') {
                 const actionsContainer = document.createElement('div');
                 actionsContainer.classList.add('post-response-actions');
 
@@ -901,83 +834,6 @@
             }
         });
 
-        // New "Think" button logic
-        thinkBtn.addEventListener('click', async () => {
-            const userMessage = messageInput.value.trim();
-            if (userMessage === '') {
-                showMessageBox('Пожалуйста, введите сообщение для размышления.');
-                return;
-            }
-
-            addMessageToChat(userMessage, 'user');
-            chatHistory.push({ role: 'user', text: userMessage }); // Add to in-memory history
-            messageInput.value = ''; // Clear input
-
-            // Add thinking process indicator
-            const thinkingProcessBubble = document.createElement('div');
-            thinkingProcessBubble.classList.add('thinking-process');
-            thinkingProcessBubble.innerHTML = `
-                <p>Kreykeryy думает...</p>
-                <ol id="thinkingSteps"></ol>
-                <p id="finalAnswerPrefix" style="display:none;"><strong>Ответ:</strong></p>
-                <div id="finalAnswerContent"></div>
-            `;
-            chatMessages.appendChild(thinkingProcessBubble);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            const thinkingSteps = thinkingProcessBubble.querySelector('#thinkingSteps');
-            const finalAnswerPrefix = thinkingProcessBubble.querySelector('#finalAnswerPrefix');
-            const finalAnswerContent = thinkingProcessBubble.querySelector('#finalAnswerContent');
-
-            let stepCount = 0;
-            const thinkingMessages = [
-                "1. Ищу более лучший ответ...",
-                "2. Анализирую запрос и собираю первичную информацию.",
-                "3. Формулирую гипотезы и стратегии решения.",
-                "4. Провожу углубленный поиск данных и фактов.",
-                "5. Оцениваю достоверность и релевантность найденной информации.",
-                "6. Синтезирую полученные данные и формирую черновик ответа.",
-                "7. Проверяю ответ на логичность, полноту и отсутствие противоречий.",
-                "8. Оптимизирую формулировку для максимальной ясности и краткости.",
-                "9. Финальная проверка и подготовка к выдаче."
-            ];
-
-            const maxThinkingTime = 60000; // 60 seconds
-            const intervalTime = maxThinkingTime / thinkingMessages.length;
-
-            const thinkingInterval = setInterval(() => {
-                if (stepCount < thinkingMessages.length) {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = thinkingMessages[stepCount];
-                    thinkingSteps.appendChild(listItem);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    stepCount++;
-                } else {
-                    clearInterval(thinkingInterval);
-                }
-            }, intervalTime);
-
-            try {
-                // Call the AI to get the actual response after the thinking process
-                const aiResponse = await sendPromptToAI(userMessage, currentModel, true); // Pass true for thinking mode
-                clearInterval(thinkingInterval); // Stop thinking animation if it's still running
-
-                finalAnswerPrefix.style.display = 'block';
-                finalAnswerContent.innerHTML = formatAIResponse(aiResponse);
-                chatHistory.push({ role: 'model', text: aiResponse, model: currentModel }); // Add to in-memory history
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            } catch (error) {
-                clearInterval(thinkingInterval); // Stop thinking animation
-                console.error("Ошибка при получении ответа от ИИ во время размышления:", error);
-                finalAnswerPrefix.style.display = 'block';
-                finalAnswerContent.innerHTML = "Извините, произошла ошибка при получении ответа во время размышления. Пожалуйста, попробуйте еще раз.";
-                showMessageBox("Ошибка ИИ: " + error.message);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        });
-
-
         // Handle file upload
         fileUploadBtn.addEventListener('click', () => {
             fileInput.click(); // Trigger hidden file input
@@ -987,22 +843,8 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            uploadedFile = file; // Store the file
-            fileCommentInput.value = ''; // Clear previous comment
-            openModal('fileUploadPromptModal'); // Open the comment modal
-        });
-
-        sendFileWithCommentBtn.addEventListener('click', async () => {
-            const comment = fileCommentInput.value.trim();
-            closeModal('fileUploadPromptModal'); // Close the modal
-
-            if (!uploadedFile) {
-                showMessageBox('Файл не выбран.');
-                return;
-            }
-
-            addMessageToChat(`Загружен файл: ${uploadedFile.name}` + (comment ? ` с комментарием: "${comment}"` : ''), 'user');
-            chatHistory.push({ role: 'user', text: `Загружен файл: ${uploadedFile.name}` + (comment ? ` с комментарием: "${comment}"` : '') });
+            addMessageToChat(`Загружен файл: ${file.name}`, 'user');
+            chatHistory.push({ role: 'user', text: `Загружен файл: ${file.name}` }); // Add to in-memory history
 
             const loadingBubble = document.createElement('div');
             loadingBubble.classList.add('message-bubble', 'ai-bubble');
@@ -1015,28 +857,26 @@
 
             try {
                 let aiResponse;
-                if (uploadedFile.type.startsWith('image/')) {
+                if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         const base64ImageData = e.target.result.split(',')[1];
-                        const imagePrompt = comment ? `${comment}\n\n` : '';
-                        aiResponse = await sendImageToAI(base64ImageData, uploadedFile.type, imagePrompt);
+                        aiResponse = await sendImageToAI(base64ImageData, file.type);
                         loadingBubble.remove();
                         addMessageToChat(aiResponse, 'ai', currentModel);
-                        chatHistory.push({ role: 'model', text: aiResponse, model: currentModel });
+                        chatHistory.push({ role: 'model', text: aiResponse, model: currentModel }); // Add to in-memory history
                     };
-                    reader.readAsDataURL(uploadedFile);
-                } else if (uploadedFile.type === 'text/plain') {
+                    reader.readAsDataURL(file);
+                } else if (file.type === 'text/plain') {
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         const textContent = e.target.result;
-                        const textPrompt = comment ? `${comment}\n\n` : `Проанализируй следующий текст из файла:\n\n`;
-                        aiResponse = await sendPromptToAI(`${textPrompt}${textContent}`, currentModel);
+                        aiResponse = await sendPromptToAI(`Проанализируй следующий текст из файла:\n\n${textContent}`, currentModel);
                         loadingBubble.remove();
                         addMessageToChat(aiResponse, 'ai', currentModel);
-                        chatHistory.push({ role: 'model', text: aiResponse, model: currentModel });
+                        chatHistory.push({ role: 'model', text: aiResponse, model: currentModel }); // Add to in-memory history
                     };
-                    reader.readAsText(uploadedFile);
+                    reader.readAsText(file);
                 } else {
                     loadingBubble.remove();
                     showMessageBox('Неподдерживаемый тип файла. Пожалуйста, загрузите текстовый файл или изображение.');
@@ -1046,8 +886,6 @@
                 console.error("Ошибка при обработке файла:", error);
                 addMessageToChat("Извините, произошла ошибка при обработке файла.", 'ai', currentModel);
                 showMessageBox("Ошибка файла: " + error.message);
-            } finally {
-                uploadedFile = null; // Clear the stored file
             }
         });
 
@@ -1070,7 +908,7 @@
                 contents: contents
             };
             // *** ВАЖНО: ВАШ API КЛЮЧ GEMINI (полученный из Google AI Studio) ***
-            const apiKey = ""; // <-- ВАШ КЛЮЧ GEMINI
+            const apiKey = "AIzaSyDfSfdMpQ9rxxDGOLER56fLiRoWt9BbjHU"; // <-- ВАШ КЛЮЧ GEMINI
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1109,8 +947,8 @@
         }
 
         // Function to call Gemini API for image understanding (OCR)
-        async function sendImageToAI(base64ImageData, mimeType, userComment = '') {
-            const prompt = userComment || "Опиши текст на этом изображении. Если текста нет, опиши, что изображено.";
+        async function sendImageToAI(base64ImageData, mimeType) {
+            const prompt = "Опиши текст на этом изображении. Если текста нет, опиши, что изображено.";
             // Prepend system prompt to the user prompt for image context
             const contents = [{
                 role: "user",
@@ -1129,7 +967,7 @@
                 contents: contents,
             };
             // *** ВАЖНО: ВАШ API КЛЮЧ GEMINI (полученный из Google AI Studio) ***
-            const apiKey = ""; // <-- ВАШ КЛЮЧ GEMINI
+            const apiKey = "AIzaSyDfSfdMpQ9rxxDGOLER56fLiRoWt9BbjHU"; // <-- ВАШ КЛЮЧ GEMINI
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1169,47 +1007,36 @@
 
 
         // Orchestrate AI responses based on selected model
-        async function sendPromptToAI(userMessage, model, isThinkingMode = false) {
-            // Check for model query
-            const modelQueryRegex = /какая ты модель|какую модель ты используешь/i;
-            if (modelQueryRegex.test(userMessage)) {
-                return `Я сейчас использую модель ${model}.`;
-            }
-
+        async function sendPromptToAI(userMessage, model) {
             // Use in-memory chatHistory for context
             let aiResponse = "Извините, я не смог обработать ваш запрос.";
 
             try {
-                let promptToSend = userMessage;
-                if (isThinkingMode) {
-                    promptToSend = `Симулируй процесс размышления для следующего запроса, затем дай окончательный ответ. Каждый шаг должен быть отдельным пунктом в нумерованном списке, а "Ответ:" должен быть в конце. Запрос: "${userMessage}"`;
-                }
-
                 switch (model) {
                     case 'R1': // Общий поиск в интернете (simulated)
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R1 (Общий поиск).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${userMessage}". Модель: Kreyker R1 (Общий поиск).`, chatHistory);
                         break;
                     case 'R2': // С Gemini
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}". Модель: Kreyker R2 (С Gemini).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${userMessage}". Модель: Kreyker R2 (С Gemini).`, chatHistory);
                         break;
                     case 'S1': // Улучшенный поиск (Google+Gemini = Gemini = Ответ)
-                        const searchPrompt = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${promptToSend}".`;
+                        const searchPrompt = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${userMessage}".`;
                         const searchResponse = await callGeminiAPI(searchPrompt, chatHistory);
-                        const finalS1Prompt = `Используя следующую информацию: "${searchResponse}" и исходный запрос: "${promptToSend}", сформулируй полный и точный ответ. Модель: Kreyker S1 (Улучшенный поиск).`;
+                        const finalS1Prompt = `Используя следующую информацию: "${searchResponse}" и исходный запрос: "${userMessage}", сформулируй полный и точный ответ. Модель: Kreyker S1 (Улучшенный поиск).`;
                         aiResponse = await callGeminiAPI(finalS1Prompt, chatHistory);
                         break;
                     case 'S1 Pro': // Глубокое раздумье
-                        aiResponse = await callGeminiAPI(`Глубоко проанализируй и дай развернутый ответ на вопрос: "${promptToSend}". Модель: Kreyker S1 Pro (Глубокое раздумье).`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Глубоко проанализируй и дай развернутый ответ на вопрос: "${userMessage}". Модель: Kreyker S1 Pro (Глубокое раздумье).`, chatHistory);
                         break;
                     case 'S2': // Глубокое раздумье + Улучшенный поиск
-                        const searchPromptS2 = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${promptToSend}".`;
+                        const searchPromptS2 = `Используй свои знания, чтобы найти ключевую информацию по запросу: "${userMessage}".`;
                         const searchResponseS2 = await callGeminiAPI(searchPromptS2, chatHistory);
-                        const finalS2Prompt = `Глубоко проанализируй и дай развернутый ответ, используя следующую информацию: "${searchResponseS2}" и исходный запрос: "${promptToSend}". Модель: Kreyker S2 (Глубокое раздумье + Улучшенный поиск).`;
+                        const finalS2Prompt = `Глубоко проанализируй и дай развернутый ответ, используя следующую информацию: "${searchResponseS2}" и исходный запрос: "${userMessage}". Модель: Kreyker S2 (Глубокое раздумье + Улучшенный поиск).`;
                         aiResponse = await callGeminiAPI(finalS2Prompt, chatHistory);
                         break;
                     case 'S3 MAX': // Максимальная точность
                         const s3MaxPrompt = `
-                            Проведи глубокий анализ и выполни тщательный поиск информации по запросу: "${promptToSend}".
+                            Проведи глубокий анализ и выполни тщательный поиск информации по запросу: "${userMessage}".
                             Сформулируй максимально точный, подробный и всеобъемлющий ответ, учитывая все нюансы.
                             Особое внимание удели верификации фактов и предоставлению наиболее релевантных данных.
                             Модель: Kreyker S3 MAX (Глубокое раздумье + Улучшенный поиск + Точность).
@@ -1217,7 +1044,7 @@
                         aiResponse = await callGeminiAPI(s3MaxPrompt, chatHistory);
                         break;
                     default:
-                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${promptToSend}".`, chatHistory);
+                        aiResponse = await callGeminiAPI(`Ответь на вопрос: "${userMessage}".`, chatHistory);
                         break;
                 }
             } catch (error) {
@@ -1246,10 +1073,7 @@
             document.querySelectorAll('.model-option').forEach(option => {
                 option.classList.toggle('selected', option.dataset.model === currentModel);
             });
-            // Update the system prompt with the new currentModel
-            systemPrompt.replace(/Я сейчас использую модель \[текущая модель, например, Kreyker R2\]./g, `Я сейчас использую модель ${currentModel}.`);
         }
-
 
         // Theme selection logic
         lightThemeBtn.addEventListener('click', () => applyTheme('light'));
