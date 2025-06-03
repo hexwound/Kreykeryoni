@@ -443,6 +443,8 @@
                 <h1 class="text-xl font-semibold text-gray-800 dark:text-white">Kreykeryy</h1>
             </div>
             <div class="flex items-center gap-4">
+                <button id="summarizeChatBtn" class="text-gray-600 dark:text-gray-300 text-2xl hover:text-gray-800 dark:hover:text-white transition-colors duration-200">
+                    <i class="fas fa-file-alt"></i> </button>
                 <button id="settingsBtn" class="text-gray-600 dark:text-gray-300 text-2xl hover:text-gray-800 dark:hover:text-white transition-colors duration-200">
                     <i class="fas fa-cog"></i> </button>
             </div>
@@ -563,6 +565,7 @@
         const thinkBtn = document.getElementById('thinkBtn'); // New "Think" button
         const modelSelectBtn = document.getElementById('modelSelectBtn');
         const settingsBtn = document.getElementById('settingsBtn');
+        const summarizeChatBtn = document.getElementById('summarizeChatBtn'); // New Summarize Chat button
         const modelSelectModal = document.getElementById('modelSelectModal');
         const settingsModal = document.getElementById('settingsModal');
         const lightThemeBtn = document.getElementById('lightThemeBtn');
@@ -750,6 +753,13 @@
                     }
                 };
                 actionsContainer.appendChild(regenerateBtn);
+
+                // New "Expand" button
+                const expandBtn = document.createElement('button');
+                expandBtn.classList.add('post-response-button');
+                expandBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Развить ✨';
+                expandBtn.onclick = () => expandResponse(text);
+                actionsContainer.appendChild(expandBtn);
 
                 messageBubble.appendChild(actionsContainer);
             }
@@ -1050,26 +1060,89 @@
             }
         });
 
+        // Function to summarize chat history
+        summarizeChatBtn.addEventListener('click', async () => {
+            if (chatHistory.length === 0) {
+                showMessageBox('Чат пуст. Нет ничего для суммирования.');
+                return;
+            }
+
+            addMessageToChat('Суммирую чат...', 'user');
+
+            const loadingBubble = document.createElement('div');
+            loadingBubble.classList.add('message-bubble', 'ai-bubble');
+            loadingBubble.innerHTML = `
+                <img src="https://placehold.co/24x24/${currentAccentColor.substring(1)}/${isLightColor(currentAccentColor) ? '333' : 'fff'}?text=K&_=${new Date().getTime()}" alt="AI Icon" class="rounded-full mr-2">
+                <div class="loading-dots"><span></span><span></span><span></span></div>
+            `;
+            chatMessages.appendChild(loadingBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const conversationText = chatHistory.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Kreykeryy'}: ${msg.text}`).join('\n');
+                const summaryPrompt = `Суммируй следующую беседу:\n\n${conversationText}`;
+                const summary = await callGeminiAPI(summaryPrompt, [], currentModel); // Pass empty history for summary context
+                
+                loadingBubble.remove();
+                addMessageToChat(`✨ **Сводка чата:**\n\n${summary}`, 'ai', currentModel);
+            } catch (error) {
+                loadingBubble.remove();
+                console.error("Ошибка при суммировании чата:", error);
+                addMessageToChat("Извините, произошла ошибка при суммировании чата.", 'ai', currentModel);
+                showMessageBox("Ошибка суммирования: " + error.message);
+            }
+        });
+
+        // Function to expand AI response
+        async function expandResponse(textToExpand) {
+            addMessageToChat('Развиваю ответ...', 'user');
+
+            const loadingBubble = document.createElement('div');
+            loadingBubble.classList.add('message-bubble', 'ai-bubble');
+            loadingBubble.innerHTML = `
+                <img src="https://placehold.co/24x24/${currentAccentColor.substring(1)}/${isLightColor(currentAccentColor) ? '333' : 'fff'}?text=K&_=${new Date().getTime()}" alt="AI Icon" class="rounded-full mr-2">
+                <div class="loading-dots"><span></span><span></span><span></span></div>
+            `;
+            chatMessages.appendChild(loadingBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const expansionPrompt = `Разверни или продолжи следующую мысль:\n\n"${textToExpand}"`;
+                const expandedText = await callGeminiAPI(expansionPrompt, [], currentModel); // Pass empty history for expansion context
+                
+                loadingBubble.remove();
+                addMessageToChat(`✨ **Продолжение ответа:**\n\n${expandedText}`, 'ai', currentModel);
+            } catch (error) {
+                loadingBubble.remove();
+                console.error("Ошибка при развитии ответа:", error);
+                addMessageToChat("Извините, произошла ошибка при развитии ответа.", 'ai', currentModel);
+                showMessageBox("Ошибка развития: " + error.message);
+            }
+        }
+
+
         // Function to call Gemini API for text
         async function callGeminiAPI(prompt, chatHistoryContext = [], modelUsed = currentModel) { // Added modelUsed parameter
             // Construct full chat history for Gemini API, ensuring role alternation.
             const contents = [];
             
+            // Add the base system prompt as the first user message
+            contents.push({ role: "user", parts: [{ text: systemPromptBase }] });
+
             // Add previous chat history, ensuring roles alternate correctly
             // Limit context to last 10 messages (5 user, 5 model) to avoid exceeding token limits
             chatHistoryContext.slice(-10).forEach(msg => {
                 contents.push({ role: msg.role, parts: [{ text: msg.text }] });
             });
             
-            // Dynamically add the system prompt with the current model information
-            const dynamicSystemPrompt = systemPromptBase + `\n\nЕсли тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${modelUsed}."`;
-            contents.push({ role: "user", parts: [{ text: dynamicSystemPrompt + "\n\n" + prompt }] });
+            // Add the current user prompt
+            contents.push({ role: "user", parts: [{ text: prompt }] });
 
             const payload = {
                 contents: contents
             };
             // *** ВАЖНО: ВСТАВЬТЕ СЮДА СВОЙ API КЛЮЧ GEMINI ***
-            const apiKey = "YOUR_GEMINI_API_KEY"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
+            const apiKey = "AIzaSyDfSfdMpQ9rxxDGOLER56fLiRoWt9BbjHU"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1114,7 +1187,7 @@
             const contents = [{
                 role: "user",
                 parts: [
-                    { text: systemPromptBase + `\n\nЕсли тебя спросят "Какая ты модель?" или "Какую модель ты используешь?", ответь: "Я сейчас использую модель ${currentModel}."` + "\n\n" + prompt },
+                    { text: systemPromptBase + "\n\n" + prompt },
                     {
                         inlineData: {
                             mimeType: mimeType,
@@ -1128,7 +1201,7 @@
                 contents: contents,
             };
             // *** ВАЖНО: ВСТАВЬТЕ СЮДА СВОЙ API КЛЮЧ GEMINI ***
-            const apiKey = "YOUR_GEMINI_API_KEY"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
+            const apiKey = "AIzaSyDfSfdMpQ9rxxDGOLER56fLiRoWt9BbjHU"; // <-- ВСТАВЬТЕ ВАШ КЛЮЧ GEMINI СЮДА
             // *** КОНЕЦ ВАЖНОЙ СЕКЦИИ ***
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
